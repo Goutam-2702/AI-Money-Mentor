@@ -2,79 +2,58 @@ import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import dbConnect from '@/lib/db';
 import { UserFinance } from '@/models/UserFinance';
-import { getFinancialAdvice } from '@/lib/ai';
+import { getFinancialSummary } from '@/lib/ai';
+import { calculateHealthScore } from '@/lib/finance/scoring';
+import { calculateFireCorpus } from '@/lib/finance/fire';
+import { generateInsights } from '@/lib/finance/insights';
+import { generateSmartPlan } from '@/lib/finance/planning';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { age, income, expenses, savings, investments, loans, goals } = body;
+    let { age, income, expenses, savings, investments, loans, goals } = body;
 
-    // RULE-BASED SCORING
-    let score = 0;
+    // Use mock data fallback if user input is incomplete
+    if (!income || !expenses) {
+      income = 50000;
+      expenses = 30000;
+      age = age || 25;
+      savings = savings || 10000;
+      loans = loans || 0;
+      investments = investments || "None";
+      goals = goals || "Save for the future";
+    }
+
+    // 1. Scoring Engine
+    const health = calculateHealthScore(income, expenses, savings, loans);
     
-    // 1. Savings Rate
-    let savingsRatePercentage = 0;
-    if (income > 0) {
-      savingsRatePercentage = ((income - expenses) / income) * 100;
-    }
+    // 2. FIRE Engine
+    const fireData = calculateFireCorpus(expenses * 12);
     
-    if (savingsRatePercentage > 30) {
-      score += 40; // Good
-    } else if (savingsRatePercentage >= 10 && savingsRatePercentage <= 30) {
-      score += 20; // Medium
-    } else {
-      score += 5; // Poor
-    }
-
-    // 2. Emergency Fund
-    let emergencyMonths = 0;
-    if (expenses > 0) {
-      emergencyMonths = savings / expenses;
-    }
+    // 3. Insight Engine
+    const insights = generateInsights(health.breakdown.savingsRate, health.breakdown.emergencyMonths, health.breakdown.debtRatio);
     
-    if (emergencyMonths >= 6) {
-      score += 30; // Good
-    } else if (emergencyMonths >= 3) {
-      score += 15; // Medium
-    } else {
-      score += 5; // Poor
-    }
+    // 4. Planning Engine
+    const monthlyPlan = generateSmartPlan(income, expenses, savings);
 
-    // 3. Debt Ratio
-    let debtRatio = 0;
-    if (income > 0) {
-      debtRatio = loans / income;
-    }
-    
-    if (debtRatio === 0) {
-      score += 30;
-    } else if (debtRatio < 0.2) {
-      score += 25;
-    } else if (debtRatio < 0.4) {
-      score += 15;
-    } else {
-      score += 0;
-    }
+    // 5. LLM Summary Engine (NO math allowed in AI)
+    const aiPayload = {
+      score: health.total,
+      savingsRate: health.breakdown.savingsRate,
+      emergencyMonths: health.breakdown.emergencyMonths,
+      debtRatio: health.breakdown.debtRatio,
+      goals
+    };
+    const aiSummary = await getFinancialSummary(aiPayload);
 
-    // Keep it max 100
-    if(score > 100) score = 100;
-
-    // AI Call
-    const aiResponse = await getFinancialAdvice({
-      age, income, expenses, savings, investments, loans, goals, score
-    });
-
+    // Final Strict Output Format
     const finalData = {
-      score,
-      problems: aiResponse.problems || [],
-      actions: aiResponse.actions || [],
-      investments: aiResponse.investments || [],
-      warnings: aiResponse.warnings || [],
-      plan_3_months: aiResponse.plan_3_months || {
-        month1: [],
-        month2: [],
-        month3: []
-      }
+      score: health.total,
+      breakdown: health.breakdown,
+      fire_plan: fireData,
+      insights,
+      monthly_plan: monthlyPlan,
+      ai_summary: aiSummary
     };
 
     // Save to DB (Optional, but required by specs)
@@ -85,11 +64,9 @@ export async function POST(req: Request) {
         const savedRecord = await UserFinance.create({
           age, income, expenses, savings, investments, loans, goals,
           score: finalData.score,
-          problems: finalData.problems,
-          actions: finalData.actions,
-          recommendedInvestments: finalData.investments,
-          warnings: finalData.warnings,
-          plan: finalData.plan_3_months
+          ai_summary: finalData.ai_summary,
+          insights: finalData.insights.map(i => i.text),
+          monthly_plan: finalData.monthly_plan
         });
         savedId = savedRecord._id;
       }
@@ -103,3 +80,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
