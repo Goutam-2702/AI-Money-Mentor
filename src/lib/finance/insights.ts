@@ -25,3 +25,25 @@ export function generateInsights(savingsRate: number, emergencyMonths: number, d
 
   return insights;
 }
+
+export function generateShockInsights(
+  savingsRate: number, 
+  emergencyMonths: number, 
+  yearsSaved: number
+) {
+  const shockInsights = [];
+
+  if (savingsRate < 20) {
+    shockInsights.push("You are saving too little to retire comfortably");
+  }
+
+  if (yearsSaved > 5) {
+    shockInsights.push("Small changes today can accelerate your retirement significantly");
+  }
+
+  if (emergencyMonths < 3) {
+    shockInsights.push("High financial risk due to low emergency buffer");
+  }
+
+  return shockInsights;
+}
