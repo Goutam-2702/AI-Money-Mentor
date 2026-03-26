@@ -1,21 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "AI Money Mentor",
-  description: "Your personalized AI personal finance advisor for India.",
+  title: "AI Money Mentor by ET",
+  description: "Premium personal wealth manager.",
 };
 
 export default function RootLayout({
@@ -26,10 +26,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${playfair.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-white dark:bg-slate-950 transition-colors duration-300">
+      <body className="min-h-full flex flex-col bg-white dark:bg-slate-950 transition-colors duration-300 font-sans text-slate-900 dark:text-slate-50">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -42,3 +42,4 @@ export default function RootLayout({
     </html>
   );
 }
+
