@@ -1,216 +1,354 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
-import { TrendingUp, AlertTriangle, CalendarDays, Activity, Flame, Bot, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, RadialBarChart, RadialBar, Legend
+} from "recharts";
+import { AlertCircle, AlertTriangle, ShieldAlert, ShieldCheck, Zap, User, Users, Coins, TrendingUp } from "lucide-react";
 
-const COLORS = ['#ef4444', '#22c55e', '#f59e0b', '#3b82f6'];
-
-export function Dashboard({ data, formData, onReset }: { data: any, formData: any, onReset: () => void }) {
-  const investable = formData.income - formData.expenses > 0 ? formData.income - formData.expenses : 0;
-  
-  const chartData = [
-    { name: 'Expenses', value: formData.expenses },
-    { name: 'Investable Cashflow', value: investable },
+// Helper for Central Gauge
+const GaugeChart = ({ score }: { score: number }) => {
+  const data = [
+    { name: 'Score', value: score, fill: '#8B0000' },
+    { name: 'Remaining', value: 100 - score, fill: '#f1f5f9' }
   ];
-
-  const getScoreInfo = (score: number) => {
-    if (score >= 80) return { color: 'text-green-500', bg: 'bg-green-500', text: 'Excellent' };
-    if (score >= 50) return { color: 'text-amber-500', bg: 'bg-amber-500', text: 'Needs Improvement' };
-    return { color: 'text-red-500', bg: 'bg-red-500', text: 'Critical Action Needed' };
-  };
-
-  const getInsightIcon = (type: string) => {
-    if (type === 'success') return <CheckCircle2 className="w-5 h-5 text-green-500" />;
-    if (type === 'danger') return <XCircle className="w-5 h-5 text-red-500" />;
-    return <AlertCircle className="w-5 h-5 text-amber-500" />;
-  };
-
-  const scoreInfo = getScoreInfo(data.score);
-
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-16">
-      
-      {/* 1. TOP SUMMARY CARD */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-slate-900 overflow-hidden rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800 relative"
-      >
-        <div className={`absolute top-0 left-0 w-full h-2 ${scoreInfo.bg}`} />
-        <div className="p-8 flex flex-col md:flex-row gap-6 items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-600">Your Financial Blueprint</h1>
-            <p className="text-slate-500 mt-2 font-medium flex items-center gap-2">
-              Health Status: <span className={`${scoreInfo.color} font-bold`}>{scoreInfo.text}</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-center bg-slate-50 dark:bg-slate-800 px-6 py-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-inner">
-              <div className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-1">Score</div>
-              <div className={`text-6xl font-black tracking-tighter ${scoreInfo.color}`}>
-                {data.score}
-                <span className="text-2xl text-slate-400 font-bold">/100</span>
-              </div>
-            </div>
-            <button 
-              onClick={onReset}
-              className="px-6 py-3 rounded-xl font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition shadow-sm"
-            >
-              Recalculate
-            </button>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* 2. HERO FEATURE: WHAT TO DO THIS MONTH */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.1 }}
-        className="bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 rounded-3xl p-8 shadow-xl border border-slate-800 relative overflow-hidden text-white"
-      >
-        <div className="absolute top-0 right-0 p-8 opacity-10">
-          <CalendarDays className="w-32 h-32" />
-        </div>
-        <div className="relative z-10">
-          <h2 className="text-2xl font-bold flex items-center gap-3 mb-6">
-            <span className="bg-emerald-500 text-white px-3 py-1 rounded-lg text-sm uppercase tracking-wider font-black shadow-lg">Hero Rule</span>
-            What Should I Do THIS MONTH?
-          </h2>
-          <div className="space-y-4 max-w-3xl">
-            {data.monthly_plan?.map((step: string, i: number) => (
-              <div key={i} className="flex gap-4 items-start bg-slate-800/50 p-4 rounded-2xl border border-slate-700 backdrop-blur-sm">
-                <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0 shadow-inner border border-emerald-500/30">
-                  {i + 1}
-                </div>
-                <p className="text-lg font-medium tracking-tight mt-0.5 text-slate-100">
-                  {step}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </motion.div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* 3. CASHFLOW CHART */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="col-span-1 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col"
-        >
-          <h3 className="text-lg font-bold flex items-center gap-2 mb-4"><Activity className="w-5 h-5 text-emerald-500" /> Cashflow</h3>
-          <div className="flex-1 min-h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  <Cell fill="#ef4444" />
-                  <Cell fill="#10b981" />
-                </Pie>
-                <Tooltip 
-                  formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`}
-                  contentStyle={{
-                    backgroundColor: 'var(--card)',
-                    borderRadius: '12px',
-                    borderColor: 'var(--border)',
-                    color: 'var(--foreground)',
-                  }}
-                  itemStyle={{ color: 'var(--foreground)' }}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* 4. ALGORITHMIC INSIGHTS */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800"
-        >
-          <h3 className="text-lg font-bold flex items-center gap-2 mb-6"><AlertTriangle className="w-5 h-5 text-amber-500" /> System Insights</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {data.insights?.map((insight: any, i: number) => (
-              <div 
-                key={i} 
-                className={`p-4 rounded-2xl border ${
-                  insight.type === 'danger' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30' : 
-                  insight.type === 'success' ? 'bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/30' : 
-                  'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30'
-                } flex gap-4 items-start`}
-              >
-                <div className="shrink-0 mt-0.5">{getInsightIcon(insight.type)}</div>
-                <p className={`text-sm font-medium ${
-                  insight.type === 'danger' ? 'text-red-900 dark:text-red-200' : 
-                  insight.type === 'success' ? 'text-green-900 dark:text-green-200' : 
-                  'text-amber-900 dark:text-amber-200'
-                }`}>{insight.text}</p>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* 5. FIRE TARGETS */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden"
-        >
-          <div className="absolute -right-6 -top-6 p-4 opacity-5 pointer-events-none">
-            <Flame className="w-48 h-48" />
-          </div>
-          <h3 className="text-lg font-bold flex items-center gap-2 mb-6"><Flame className="w-5 h-5 text-orange-500" /> F.I.R.E Targets</h3>
-          
-          <div className="space-y-6">
-            <div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Base Target (25x Yearly Expenses)</p>
-              <p className="text-3xl font-black text-slate-800 dark:text-slate-100">
-                ₹{((data.fire_plan?.baseFireCorpus) || 0).toLocaleString('en-IN')}
-              </p>
-            </div>
-            
-            <div className="p-4 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30">
-              <p className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-1">
-                Real Target (Inflation Adjusted {data.fire_plan?.inflationRate}% over {data.fire_plan?.yearsToProjection}yrs)
-              </p>
-              <p className="text-2xl font-black text-orange-600 dark:text-orange-400">
-                ₹{((data.fire_plan?.inflationAdjustedCorpus) || 0).toLocaleString('en-IN')}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-        
-        {/* 6. AI MENTOR SUMMARY */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-emerald-50 dark:bg-emerald-900/10 rounded-3xl p-6 border border-emerald-100 dark:border-emerald-900/30"
-        >
-          <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-emerald-800 dark:text-emerald-400">
-            <Bot className="w-5 h-5" /> Mentor's Verdict
-          </h3>
-          <div className="prose prose-sm dark:prose-invert text-emerald-900 dark:text-emerald-100/80 leading-relaxed font-medium">
-            {data.ai_summary}
-          </div>
-        </motion.div>
-
+    <div className="relative w-48 h-48 mx-auto">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={80}
+            startAngle={180}
+            endAngle={0}
+            dataKey="value"
+            stroke="none"
+            cornerRadius={5}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+        <div className="text-5xl font-serif font-black text-slate-800 dark:text-slate-100">{score}</div>
+        <div className="text-xs font-sans font-bold text-slate-500 uppercase tracking-widest mt-1">Health</div>
       </div>
     </div>
   );
+};
+
+// Mini Radar/Progress
+const MiniScore = ({ title, score, color }: { title: string, score: number, color: string }) => {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative w-16 h-16">
+        <svg viewBox="0 0 36 36" className="w-full h-full">
+          <path
+            className="text-slate-100 dark:text-slate-800"
+            strokeWidth="3"
+            stroke="currentColor"
+            fill="none"
+            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+          />
+          <path
+            className={color}
+            strokeWidth="3"
+            strokeDasharray={`${score}, 100`}
+            stroke="currentColor"
+            fill="none"
+            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-300">
+          {score}
+        </div>
+      </div>
+      <p className="text-xs font-sans font-medium text-slate-600 dark:text-slate-400 mt-2">{title}</p>
+    </div>
+  );
+};
+
+export function Dashboard({ data, formData, onReset }: { data: any, formData: any, onReset: () => void }) {
+  const [retireAge, setRetireAge] = useState(45);
+
+  // Generate dynamic FIRE data based on dragged retireAge
+  const generateFireData = (age: number) => {
+    let currentAge = 32;
+    const mockData = [];
+    let corpus = 1000000;
+    let savings = 500000;
+    let inflation = 200000;
+    
+    for (let i = currentAge; i <= 60; i += 2) {
+      if (i > age) {
+        // Post retirement, corpus drops slightly while inflation rises
+        corpus = corpus * 1.05 - 800000;
+        savings = savings * 1.02;
+        inflation = inflation * 1.08;
+      } else {
+        corpus = corpus * 1.15 + 1000000;
+        savings = savings + 800000;
+        inflation = inflation * 1.06;
+      }
+      mockData.push({
+        age: i,
+        corpus: Math.max(corpus, 0),
+        savings: savings,
+        inflation: inflation
+      });
+    }
+    return mockData;
+  };
+
+  const fireData = generateFireData(retireAge);
+
+  const portfolio = [
+    { name: "HDFC Small Cap Fund", type: "Equity", allocation: "30%", overlap: true, expenseRatio: "1.8%", flag: true },
+    { name: "Parag Parikh Flexi Cap", type: "Equity", allocation: "40%", overlap: false, expenseRatio: "0.7%", flag: false },
+    { name: "SBI Nifty 50 Index", type: "Equity", allocation: "20%", overlap: true, expenseRatio: "0.2%", flag: false },
+    { name: "Axis Bluechip Fund", type: "Equity", allocation: "10%", overlap: true, expenseRatio: "1.9%", flag: true }
+  ];
+
+  return (
+    <div className="space-y-10 max-w-6xl mx-auto pb-24">
+      
+      {/* 1. MONEY HEALTH DASHBOARD */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-sm border border-slate-200 dark:border-slate-800"
+      >
+        <h2 className="text-2xl font-serif font-bold text-[#8B0000] dark:text-red-400 mb-6 text-center border-b pb-4 border-slate-100 dark:border-slate-800">
+          Your Comprehensive Money Health
+        </h2>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-12">
+          
+          <div className="w-full md:w-1/3 text-center">
+            <GaugeChart score={data.score?.overall || 78} />
+          </div>
+
+          <div className="w-full md:w-2/3 grid grid-cols-2 sm:grid-cols-3 gap-6">
+            <MiniScore title="Emergency" score={data.score?.emergencyFund || 90} color="text-green-500" />
+            <MiniScore title="Insurance" score={data.score?.insurance || 75} color="text-blue-500" />
+            <MiniScore title="Debt" score={data.score?.debt || 60} color="text-amber-500" />
+            <MiniScore title="Tax" score={data.score?.taxOptimization || 50} color="text-red-500" />
+            <MiniScore title="Investments" score={data.score?.investments || 80} color="text-emerald-500" />
+            <MiniScore title="Retirement" score={65} color="text-purple-500" />
+          </div>
+
+        </div>
+      </motion.div>
+
+      {/* 2. THE FIRE PATH SLIDER */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+        className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden"
+      >
+        <h2 className="text-2xl font-serif font-bold text-slate-800 dark:text-slate-100 mb-2">
+          The FIRE Path Simulator
+        </h2>
+        <p className="text-slate-500 font-sans mb-8">Slide to adjust your target retirement age and see real-time corpus shifts.</p>
+        
+        <div className="mb-8 px-4">
+          <div className="flex justify-between text-sm font-sans font-medium text-slate-500 mb-2">
+            <span>Aggressive (Age 40)</span>
+            <span className="text-[#8B0000] dark:text-red-400 font-bold text-lg">Target: {retireAge} Years</span>
+            <span>Relaxed (Age 60)</span>
+          </div>
+          <input 
+            type="range" 
+            min="40" 
+            max="60" 
+            value={retireAge} 
+            onChange={(e) => setRetireAge(Number(e.target.value))}
+            className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#8B0000]"
+          />
+        </div>
+
+        <div className="w-full h-[300px]">
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={fireData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorCorpus" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#8B0000" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="#8B0000" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorSavings" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="#D4AF37" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="age" tick={{fill: '#94a3b8'}} />
+              <YAxis tickFormatter={(val) => `₹${(val / 10000000).toFixed(1)}Cr`} tick={{fill: '#94a3b8'}} />
+              <RechartsTooltip formatter={(value: any) => `₹${(Number(value) / 100000).toFixed(2)}L`} />
+              <Legend />
+              <Area type="monotone" dataKey="inflation" stroke="#64748b" fill="#f1f5f9" name="Inflation Impact" />
+              <Area type="monotone" dataKey="savings" stroke="#D4AF37" fillOpacity={1} fill="url(#colorSavings)" name="Total Contributions" />
+              <Area type="monotone" dataKey="corpus" stroke="#8B0000" fillOpacity={1} fill="url(#colorCorpus)" name="Projected Corpus" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* 3. COUPLE'S OPTIMIZER VIEW */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col"
+        >
+          <div className="flex justify-between items-start mb-6">
+            <h2 className="text-2xl font-serif font-bold text-slate-800 dark:text-slate-100 leading-tight">
+              Couple's Tax<br/>Optimizer
+            </h2>
+            <div className="bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#9a7e20] dark:text-[#D4AF37] px-4 py-2 rounded-full flex items-center gap-2 font-bold shadow-sm">
+              <Zap className="w-4 h-4" /> Tax Saved: ₹45,500
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 h-full relative">
+            <div className="absolute left-1/2 top-4 bottom-4 w-px bg-slate-200 dark:bg-slate-800 -translate-x-1/2"></div>
+            
+            <div className="pr-2 sm:pr-4">
+              <div className="flex items-center gap-1 sm:gap-2 text-slate-500 mb-4 font-sans font-medium text-xs sm:text-sm uppercase tracking-wider">
+                <User className="w-4 h-4 hidden sm:block" /> Individual
+              </div>
+              <ul className="space-y-4 font-sans text-xs sm:text-sm">
+                <li className="flex flex-col sm:flex-row sm:justify-between text-slate-700 dark:text-slate-300">
+                  <span className="mb-1 sm:mb-0">HRA Claim</span> <span className="font-medium text-slate-500">Hero (Him)</span>
+                </li>
+                <li className="flex flex-col sm:flex-row sm:justify-between text-slate-700 dark:text-slate-300">
+                  <span className="mb-1 sm:mb-0">Home Loan EMI</span> <span className="font-medium text-slate-500">Wife (Her)</span>
+                </li>
+                <li className="flex flex-col sm:flex-row sm:justify-between text-slate-700 dark:text-slate-300">
+                  <span className="mb-1 sm:mb-0">Health Ins</span> <span className="font-medium text-slate-500">Split 50/50</span>
+                </li>
+              </ul>
+              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 text-slate-400 line-through text-sm">
+                Liab: ₹2.1L
+              </div>
+            </div>
+
+            <div className="pl-2 sm:pl-4">
+              <div className="flex items-center gap-1 sm:gap-2 text-[#8B0000] dark:text-red-400 mb-4 font-sans font-bold text-xs sm:text-sm uppercase tracking-wider">
+                <Users className="w-4 h-4 hidden sm:block" /> AI-Optimized
+              </div>
+              <ul className="space-y-4 font-sans text-xs sm:text-sm">
+                <li className="flex flex-col sm:flex-row sm:justify-between font-bold text-slate-800 dark:text-slate-100">
+                  <span className="mb-1 sm:mb-0">HRA Claim</span> <span className="text-green-600">Highest Earner</span>
+                </li>
+                <li className="flex flex-col sm:flex-row sm:justify-between font-bold text-slate-800 dark:text-slate-100">
+                  <span className="mb-1 sm:mb-0">Home Loan EMI</span> <span className="text-green-600">Joint Ratio</span>
+                </li>
+                <li className="flex flex-col sm:flex-row sm:justify-between font-bold text-slate-800 dark:text-slate-100">
+                  <span className="mb-1 sm:mb-0">Health Ins</span> <span className="text-green-600">Senior Parent</span>
+                </li>
+              </ul>
+              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 font-bold text-emerald-600 sm:text-lg">
+                Liab: ₹1.64L
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* 4. PORTFOLIO X-RAY */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+          className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-sm border border-slate-200 dark:border-slate-800"
+        >
+          <h2 className="text-2xl font-serif font-bold text-slate-800 dark:text-slate-100 mb-6">
+            Portfolio X-Ray
+          </h2>
+          <div className="space-y-3">
+            {portfolio.map((fund, i) => (
+              <div key={i} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div>
+                  <h4 className="font-sans font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 text-sm sm:text-base">
+                    {fund.name} 
+                    {fund.flag && <span title="High Expense Ratio Red Flag"><AlertTriangle className="w-4 h-4 text-red-500 shrink-0" /></span>}
+                    {fund.overlap && <span title="Portfolio Overlap Alert"><AlertCircle className="w-4 h-4 text-amber-500 shrink-0" /></span>}
+                  </h4>
+                  <p className="text-xs font-sans text-slate-500 mt-1">{fund.type} • Allocation: {fund.allocation}</p>
+                </div>
+                <div className="text-right shrink-0 ml-2">
+                  <div className={`text-xs sm:text-sm font-bold font-sans ${fund.flag ? 'text-red-500' : 'text-slate-600 dark:text-slate-400'}`}>
+                    Exp: {fund.expenseRatio}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* 5. VISUAL HIERARCHY / RECOMMENDATIONS */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+        className="bg-[#8B0000] rounded-3xl p-8 shadow-xl text-white outline outline-4 outline-[#8B0000]/20"
+      >
+        <h2 className="text-2xl font-serif font-bold mb-6 flex items-center gap-3">
+          <ShieldCheck className="w-8 h-8 text-[#D4AF37]" /> AI Recommendations & Safety Meter
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white/10 p-6 rounded-2xl border border-white/20 backdrop-blur-sm">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="font-sans font-bold text-lg">Shift ₹2L from FD to Conservative Hybrid Fund</h3>
+              <div className="bg-[#D4AF37]/20 text-[#D4AF37] px-3 py-1 rounded-full text-xs font-bold uppercase border border-[#D4AF37]/50 shrink-0 ml-4">
+                Actionable
+              </div>
+            </div>
+            <p className="text-red-100 text-sm font-sans mb-6">Post-tax FD returns (5.1%) are losing to inflation. A conservative hybrid fund targets 8-9% with debt taxation.</p>
+            
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-16">Safety</span>
+                <div className="flex-1 h-3 bg-black/20 rounded-full overflow-hidden flex">
+                  <div className="bg-emerald-400 w-[80%] h-full rounded-full"></div>
+                </div>
+                <span className="text-xs font-bold text-emerald-400 w-16 text-right">High</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-16">Growth</span>
+                <div className="flex-1 h-3 bg-black/20 rounded-full overflow-hidden flex">
+                  <div className="bg-amber-400 w-[60%] h-full rounded-full"></div>
+                </div>
+                <span className="text-xs font-bold text-amber-400 w-16 text-right">Mod</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/10 p-6 rounded-2xl border border-white/20 backdrop-blur-sm">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="font-sans font-bold text-lg">Stop SIP in 'Axis Bluechip Fund'</h3>
+              <div className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold uppercase border border-emerald-500/50 shrink-0 ml-4">
+                Immediate
+              </div>
+            </div>
+            <p className="text-red-100 text-sm font-sans mb-6">84% stock overlap with your index fund. You are paying 1.9% expense ratio for index-like components.</p>
+            
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-16">Safety</span>
+                <div className="flex-1 h-3 bg-black/20 rounded-full overflow-hidden flex">
+                  <div className="bg-emerald-400 w-[100%] h-full rounded-full"></div>
+                </div>
+                <span className="text-xs font-bold text-emerald-400 w-16 text-right">Max</span>
+              </div>
+              <div className="flex items-center gap-4 mt-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-16">Growth</span>
+                <div className="flex-1 h-3 bg-black/20 rounded-full overflow-hidden flex">
+                  <div className="bg-emerald-400 w-[20%] h-full rounded-full"></div>
+                </div>
+                <span className="text-xs font-bold text-emerald-400 w-16 text-right">Low</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+    </div>
+  );
 }
+
