@@ -4,9 +4,9 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, RadialBarChart, RadialBar, Legend
+  PieChart, Pie, Cell, Legend
 } from "recharts";
-import { AlertCircle, AlertTriangle, ShieldAlert, ShieldCheck, Zap, User, Users, Coins, TrendingUp } from "lucide-react";
+import { AlertCircle, AlertTriangle, ShieldCheck, Zap, User, Users, Info } from "lucide-react";
 
 // Helper for Central Gauge
 const GaugeChart = ({ score }: { score: number }) => {
@@ -74,6 +74,22 @@ const MiniScore = ({ title, score, color }: { title: string, score: number, colo
 export function Dashboard({ data, formData, onReset }: { data: any, formData: any, onReset: () => void }) {
   const [retireAge, setRetireAge] = useState(45);
 
+  // Support both old flat score and new nested score object
+  const scores = data.score ?? {};
+  const overallScore = typeof scores === 'number' ? scores : (scores.overall ?? 78);
+  const emergencyScore = typeof scores === 'number' ? 75 : (scores.emergency ?? 75);
+  const insuranceScore = typeof scores === 'number' ? 70 : (scores.insurance ?? 70);
+  const debtScore = typeof scores === 'number' ? 70 : (scores.debt ?? 70);
+  const taxScore = typeof scores === 'number' ? 50 : (scores.tax ?? 50);
+  const investmentScore = typeof scores === 'number' ? 70 : (scores.investments ?? 70);
+  const retirementScore = typeof scores === 'number' ? 65 : (scores.retirement ?? 65);
+
+  // Prefer richer recommendations array, fall back to old insights
+  const recommendations = data.recommendations ?? data.insights ?? [];
+  const quickAction = data.quickAction ?? data.advice ?? null;
+  const taxComparison = data.taxComparison ?? null;
+  const shockInsights = data.shockInsights ?? data.shock_insights ?? [];
+
   // Generate dynamic FIRE data based on dragged retireAge
   const generateFireData = (age: number) => {
     let currentAge = 32;
@@ -115,6 +131,13 @@ export function Dashboard({ data, formData, onReset }: { data: any, formData: an
   return (
     <div className="space-y-10 max-w-6xl mx-auto pb-24">
       
+      {/* RESET BUTTON */}
+      <div className="flex justify-end -mb-4">
+        <button onClick={onReset} className="text-sm font-sans text-slate-500 hover:text-[#8B0000] dark:text-slate-400 dark:hover:text-red-400 transition underline">
+          ← Analyse another profile
+        </button>
+      </div>
+
       {/* 1. MONEY HEALTH DASHBOARD */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
@@ -126,16 +149,16 @@ export function Dashboard({ data, formData, onReset }: { data: any, formData: an
         <div className="flex flex-col md:flex-row items-center justify-between gap-12">
           
           <div className="w-full md:w-1/3 text-center">
-            <GaugeChart score={data.score?.overall || 78} />
+            <GaugeChart score={overallScore} />
           </div>
 
           <div className="w-full md:w-2/3 grid grid-cols-2 sm:grid-cols-3 gap-6">
-            <MiniScore title="Emergency" score={data.score?.emergencyFund || 90} color="text-green-500" />
-            <MiniScore title="Insurance" score={data.score?.insurance || 75} color="text-blue-500" />
-            <MiniScore title="Debt" score={data.score?.debt || 60} color="text-amber-500" />
-            <MiniScore title="Tax" score={data.score?.taxOptimization || 50} color="text-red-500" />
-            <MiniScore title="Investments" score={data.score?.investments || 80} color="text-emerald-500" />
-            <MiniScore title="Retirement" score={65} color="text-purple-500" />
+            <MiniScore title="Emergency" score={emergencyScore} color="text-green-500" />
+            <MiniScore title="Insurance" score={insuranceScore} color="text-blue-500" />
+            <MiniScore title="Debt" score={debtScore} color="text-amber-500" />
+            <MiniScore title="Tax" score={taxScore} color="text-red-500" />
+            <MiniScore title="Investments" score={investmentScore} color="text-emerald-500" />
+            <MiniScore title="Retirement" score={retirementScore} color="text-purple-500" />
           </div>
 
         </div>
@@ -282,73 +305,102 @@ export function Dashboard({ data, formData, onReset }: { data: any, formData: an
         </motion.div>
       </div>
 
-      {/* 5. VISUAL HIERARCHY / RECOMMENDATIONS */}
+      {/* 5. AI RECOMMENDATIONS + SAFETY METERS */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
         className="bg-[#8B0000] rounded-3xl p-8 shadow-xl text-white outline outline-4 outline-[#8B0000]/20"
       >
         <h2 className="text-2xl font-serif font-bold mb-6 flex items-center gap-3">
-          <ShieldCheck className="w-8 h-8 text-[#D4AF37]" /> AI Recommendations & Safety Meter
+          <ShieldCheck className="w-8 h-8 text-[#D4AF37]" /> AI Recommendations
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white/10 p-6 rounded-2xl border border-white/20 backdrop-blur-sm">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="font-sans font-bold text-lg">Shift ₹2L from FD to Conservative Hybrid Fund</h3>
-              <div className="bg-[#D4AF37]/20 text-[#D4AF37] px-3 py-1 rounded-full text-xs font-bold uppercase border border-[#D4AF37]/50 shrink-0 ml-4">
-                Actionable
+          {recommendations.slice(0, 4).map((rec: any, i: number) => (
+            <div key={rec.id ?? i} className="bg-white/10 p-6 rounded-2xl border border-white/20 backdrop-blur-sm flex flex-col gap-4">
+              <div className="flex justify-between items-start gap-3">
+                <h3 className="font-sans font-bold text-base leading-tight">{rec.title}</h3>
+                <span className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold uppercase border ${
+                  rec.severity === 'critical' ? 'bg-red-500/30 text-red-200 border-red-400/50' :
+                  rec.severity === 'high' ? 'bg-amber-500/20 text-amber-200 border-amber-400/50' :
+                  'bg-emerald-500/20 text-emerald-200 border-emerald-400/50'
+                }`}>{rec.severity}</span>
               </div>
-            </div>
-            <p className="text-red-100 text-sm font-sans mb-6">Post-tax FD returns (5.1%) are losing to inflation. A conservative hybrid fund targets 8-9% with debt taxation.</p>
-            
-            <div className="space-y-3">
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-16">Safety</span>
-                <div className="flex-1 h-3 bg-black/20 rounded-full overflow-hidden flex">
-                  <div className="bg-emerald-400 w-[80%] h-full rounded-full"></div>
+              <p className="text-red-100 text-sm font-sans">{rec.detail ?? rec.text}</p>
+              {rec.action && (
+                <p className="text-xs text-[#D4AF37] font-sans font-medium border-t border-white/10 pt-3">
+                  → {rec.action}
+                </p>
+              )}
+              {(rec.safetyScore !== undefined) && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-14">Safety</span>
+                    <div className="flex-1 h-2 bg-black/20 rounded-full overflow-hidden">
+                      <div className="bg-emerald-400 h-full rounded-full transition-all" style={{ width: `${rec.safetyScore}%` }}></div>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-400 w-8 text-right">{rec.safetyScore}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-14">Growth</span>
+                    <div className="flex-1 h-2 bg-black/20 rounded-full overflow-hidden">
+                      <div className="bg-amber-400 h-full rounded-full transition-all" style={{ width: `${rec.growthScore}%` }}></div>
+                    </div>
+                    <span className="text-xs font-bold text-amber-400 w-8 text-right">{rec.growthScore}</span>
+                  </div>
                 </div>
-                <span className="text-xs font-bold text-emerald-400 w-16 text-right">High</span>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-16">Growth</span>
-                <div className="flex-1 h-3 bg-black/20 rounded-full overflow-hidden flex">
-                  <div className="bg-amber-400 w-[60%] h-full rounded-full"></div>
-                </div>
-                <span className="text-xs font-bold text-amber-400 w-16 text-right">Mod</span>
-              </div>
+              )}
             </div>
-          </div>
-
-          <div className="bg-white/10 p-6 rounded-2xl border border-white/20 backdrop-blur-sm">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="font-sans font-bold text-lg">Stop SIP in 'Axis Bluechip Fund'</h3>
-              <div className="bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-xs font-bold uppercase border border-emerald-500/50 shrink-0 ml-4">
-                Immediate
-              </div>
-            </div>
-            <p className="text-red-100 text-sm font-sans mb-6">84% stock overlap with your index fund. You are paying 1.9% expense ratio for index-like components.</p>
-            
-            <div className="space-y-3">
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-16">Safety</span>
-                <div className="flex-1 h-3 bg-black/20 rounded-full overflow-hidden flex">
-                  <div className="bg-emerald-400 w-[100%] h-full rounded-full"></div>
-                </div>
-                <span className="text-xs font-bold text-emerald-400 w-16 text-right">Max</span>
-              </div>
-              <div className="flex items-center gap-4 mt-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-red-200 w-16">Growth</span>
-                <div className="flex-1 h-3 bg-black/20 rounded-full overflow-hidden flex">
-                  <div className="bg-emerald-400 w-[20%] h-full rounded-full"></div>
-                </div>
-                <span className="text-xs font-bold text-emerald-400 w-16 text-right">Low</span>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       </motion.div>
+
+      {/* TAX COMPARISON PANEL */}
+      {taxComparison && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+          className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-sm border border-slate-200 dark:border-slate-800"
+        >
+          <div className="flex justify-between items-start mb-6">
+            <h2 className="text-2xl font-serif font-bold text-slate-800 dark:text-slate-100">
+              Tax Regime Comparison <span className="text-base font-sans font-normal text-slate-500 ml-2">FY 2025-26</span>
+            </h2>
+            <div className="bg-[#D4AF37]/20 border border-[#D4AF37]/50 text-[#9a7e20] dark:text-[#D4AF37] px-4 py-2 rounded-full text-sm font-bold">
+              Save ₹{taxComparison.savedMonthly?.toLocaleString('en-IN')}/month
+            </div>
+          </div>
+          <p className="text-slate-600 dark:text-slate-400 font-sans text-sm mb-6">{taxComparison.reasoning}</p>
+          <div className="grid grid-cols-2 gap-4">
+            {(['old', 'new'] as const).map(regime => {
+              const r = taxComparison[regime];
+              const isRecommended = taxComparison.recommendation === regime;
+              return (
+                <div key={regime} className={`p-5 rounded-2xl border-2 ${isRecommended ? 'border-[#8B0000] bg-red-50 dark:bg-red-950/20' : 'border-slate-200 dark:border-slate-700'}`}>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-sans font-bold text-slate-800 dark:text-slate-100 capitalize">{regime} Regime</h3>
+                    {isRecommended && <span className="text-xs font-bold text-[#8B0000] dark:text-red-400 uppercase">✓ Recommended</span>}
+                  </div>
+                  <p className="text-2xl font-serif font-black text-slate-800 dark:text-slate-100">₹{r?.totalTax?.toLocaleString('en-IN')}</p>
+                  <p className="text-xs text-slate-500 font-sans mb-2">Annual Tax Liability</p>
+                  <p className="text-sm font-sans text-slate-600 dark:text-slate-400">Effective Rate: <span className="font-bold">{r?.effectiveRate}%</span></p>
+                  <p className="text-sm font-sans text-slate-600 dark:text-slate-400">In-hand/month: <span className="font-bold">₹{r?.inHandMonthly?.toLocaleString('en-IN')}</span></p>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* SEBI DISCLAIMER */}
+      <div className="flex items-start gap-3 text-xs text-slate-400 dark:text-slate-600 font-sans p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+        <p>
+          <strong>Disclaimer:</strong> AI Money Mentor provides general financial information and educational content only. It does not constitute investment advice, financial planning, or portfolio management services as defined under SEBI (Investment Advisers) Regulations, 2013. All projections are estimates based on assumed rates of return and are not guaranteed. Please consult a SEBI-registered Investment Advisor before making financial decisions. Mutual fund investments are subject to market risks. Past performance does not guarantee future results.
+        </p>
+      </div>
 
     </div>
   );
 }
+
+
 
