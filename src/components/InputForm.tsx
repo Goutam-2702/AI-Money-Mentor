@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { IndianRupee, Briefcase, PiggyBank, Target, ArrowRight, Loader2 } from "lucide-react";
+import { IndianRupee, Briefcase, PiggyBank, Target, ArrowRight, Loader2, Zap } from "lucide-react";
 
 export function InputForm({ onSubmit, isLoading }: { onSubmit: (data: any) => void, isLoading: boolean }) {
   const [formData, setFormData] = useState({
@@ -23,6 +23,20 @@ export function InputForm({ onSubmit, isLoading }: { onSubmit: (data: any) => vo
     }));
   };
 
+  const handleDemoMode = () => {
+    const demoData = {
+      age: 26,
+      income: 120000,
+      expenses: 65000,
+      savings: 50000,
+      investments: "Mutual Funds ₹2L",
+      loans: 400000,
+      goals: "FIRE by 45, travel Europe"
+    };
+    setFormData(demoData);
+    onSubmit(demoData);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
@@ -34,9 +48,17 @@ export function InputForm({ onSubmit, isLoading }: { onSubmit: (data: any) => vo
       animate={{ opacity: 1, y: 0 }}
       className="max-w-2xl mx-auto bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
     >
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 text-white">
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 text-white relative">
         <h2 className="text-3xl font-bold mb-2">Your Financial Profile</h2>
         <p className="text-emerald-100">Let's understand your current situation to give you personalized AI advice.</p>
+        
+        <button 
+          type="button" 
+          onClick={handleDemoMode}
+          className="absolute top-8 right-8 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition"
+        >
+          <Zap className="w-4 h-4 text-emerald-100" /> Try Demo
+        </button>
       </div>
       
       <form onSubmit={handleSubmit} className="p-8 space-y-6">
@@ -151,7 +173,7 @@ export function InputForm({ onSubmit, isLoading }: { onSubmit: (data: any) => vo
             </>
           ) : (
             <>
-              Generate Free AI Plan <ArrowRight className="w-5 h-5" />
+              Generate Financial Plan <ArrowRight className="w-5 h-5" />
             </>
           )}
         </button>

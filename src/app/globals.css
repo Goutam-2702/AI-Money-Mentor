@@ -3,12 +3,19 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-900: #1e3a8a;
+  --color-primary-50: #fbf5f5;
+  --color-primary-100: #f5eaea;
+  --color-primary-500: #b03a3a;
+  --color-primary-600: #8B0000; /* Deep Maroon */
+  --color-primary-700: #6b0000;
+  --color-primary-900: #4a0000;
+  
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-playfair), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+
+  --color-brand-maroon: #8B0000;
+  --color-brand-gold: #D4AF37;
+  --color-brand-slate: #475569;
 }
 
 @layer base {
@@ -18,7 +25,7 @@
     --card: #ffffff;
     --card-foreground: #0f172a;
     --border: #e2e8f0;
-    --primary: #2563eb;
+    --primary: #8B0000;
     --primary-foreground: #ffffff;
     --muted: #f1f5f9;
     --muted-foreground: #64748b;
@@ -26,17 +33,17 @@
     --accent-foreground: #0f172a;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
-    --ring: #2563eb;
+    --ring: #8B0000;
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: #020617;
+    --background: #020617; /* Very dark slate */
     --foreground: #f8fafc;
     --card: #0f172a;
     --card-foreground: #f8fafc;
     --border: #1e293b;
-    --primary: #3b82f6;
+    --primary: #a82424;
     --primary-foreground: #ffffff;
     --muted: #1e293b;
     --muted-foreground: #94a3b8;
@@ -44,7 +51,7 @@
     --accent-foreground: #f8fafc;
     --destructive: #f87171;
     --destructive-foreground: #0f172a;
-    --ring: #3b82f6;
+    --ring: #a82424;
   }
 }
 
@@ -55,6 +62,8 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: Arial, Helvetica, sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
   }
 }

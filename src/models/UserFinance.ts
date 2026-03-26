@@ -9,15 +9,9 @@ export interface IUserFinance extends Document {
   loans: number;
   goals: string;
   score: number;
-  problems: string[];
-  actions: string[];
-  recommendedInvestments: string[];
-  warnings: string[];
-  plan: {
-    month1: string[];
-    month2: string[];
-    month3: string[];
-  };
+  ai_summary: string;
+  insights: string[];
+  monthly_plan: string[];
   createdAt: Date;
 }
 
@@ -31,15 +25,9 @@ const UserFinanceSchema: Schema = new Schema({
   goals: { type: String, required: true, default: '' },
   
   score: { type: Number, required: true },
-  problems: [{ type: String }],
-  actions: [{ type: String }],
-  recommendedInvestments: [{ type: String }],
-  warnings: [{ type: String }],
-  plan: {
-    month1: [{ type: String }],
-    month2: [{ type: String }],
-    month3: [{ type: String }]
-  },
+  ai_summary: { type: String, required: true },
+  insights: [{ type: String }],
+  monthly_plan: [{ type: String }],
   createdAt: { type: Date, default: Date.now }
 });
 
