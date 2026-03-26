@@ -2,69 +2,55 @@ import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import dbConnect from '@/lib/db';
 import { UserFinance } from '@/models/UserFinance';
-import { getFinancialSummary } from '@/lib/ai';
+import { getStructuredAdvice } from '@/lib/ai';
 import { calculateWealthAndRetirement } from '@/lib/finance/fire';
 import { compareTaxRegimes, estimateTaxInput } from '@/lib/finance/tax';
 import { analyzePortfolio } from '@/lib/finance/portfolio';
 import { runRuleEngine } from '@/lib/finance/rules';
-import { validateFinancialProfile, sanitizeInput } from '@/lib/validation';
-
-// Rate limiting (simple in-memory, per-deployment)
-const ipRequestMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 10;
-const RATE_WINDOW_MS = 60 * 1000; // 1 minute
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = ipRequestMap.get(ip);
-  if (!entry || entry.resetAt < now) {
-    ipRequestMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT) return false;
-  entry.count++;
-  return true;
-}
+import { planAllGoals, totalGoalSIPRequired } from '@/lib/finance/goals';
+import { calculateProfileCompleteness } from '@/lib/finance/confidence';
+import { FinancialProfileInput, parseOrError } from '@/lib/schemas';
+import { logger } from '@/lib/logger';
 
 export async function POST(req: Request) {
-  try {
-    // ── Rate limiting ────────────────────────────────────────────────────────
-    const forwarded = req.headers.get('x-forwarded-for');
-    const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
-    if (!checkRateLimit(ip)) {
-      return NextResponse.json(
-        { success: false, error: 'Too many requests. Please wait 1 minute.' },
-        { status: 429 }
-      );
-    }
+  const start = Date.now();
+  const reqId = Math.random().toString(36).slice(2, 8);
+  const log = logger.child({ requestId: reqId, action: 'analyze' });
 
-    // ── Parse & Validate Input ───────────────────────────────────────────────
-    let body: Record<string, any>;
+  try {
+    // ── Parse & Validate ────────────────────────────────────────────────────
+    let body: unknown;
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json(
-        { success: false, error: 'Invalid JSON body.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Invalid JSON body.' }, { status: 400 });
     }
 
-    const validation = validateFinancialProfile(body);
-    if (!validation.valid) {
-      return NextResponse.json(
-        { success: false, error: 'Validation failed.', fieldErrors: validation.errors },
-        { status: 422 }
-      );
-    }
+    const parsed = parseOrError(FinancialProfileInput, body);
+    if (!parsed.success) return parsed.response;
 
-    const { age, income, expenses, savings, loans, investments, goals } =
-      sanitizeInput(body);
+    const input = parsed.data;
+    const { age, income, expenses, savings, loans, investments, goals,
+            riskAppetite = 'moderate', fundIds, goalsList, _form16 } = input;
 
-    // ── 1. Rule Engine + Comprehensive Health Scoring ────────────────────────
-    // Derive quick estimates from text for rule engine
-    const hasSIPKeywords = /sip|mutual|equity|elss|index/i.test(investments);
-    const hasFDKeywords = /fd|fixed deposit|ppf|nps|gold/i.test(investments);
-    const monthlySIPEstimate = hasSIPKeywords ? income * 0.1 : 0;
+    log.info({ age, income: `₹${income}`, expenses: `₹${expenses}` }, 'Analysis started');
+
+    // ── 1. Profile completeness & confidence baseline ────────────────────────
+    const profileCompleteness = calculateProfileCompleteness({
+      age, income, expenses, savings, loans,
+      riskAppetite,
+      hasTermInsurance: input.hasTermInsurance,
+      hasHealthInsurance: input.hasHealthInsurance,
+      employmentType: input.employmentType,
+      city: input.city,
+    });
+
+    const dataSource = _form16 ? 'form16' : 'user_input';
+
+    // ── 2. Rule Engine (health scores + recommendations) ────────────────────
+    const monthlySIPEstimate = /sip|elss|mutual|equity/i.test(investments)
+      ? income * 0.12 : 0;
+    const emiEstimate = input.monthlyEMI ?? (loans > 0 ? Math.round(loans * 0.009) : 0);
 
     const ruleOutput = runRuleEngine({
       age,
@@ -73,124 +59,140 @@ export async function POST(req: Request) {
       monthlyExpenses: expenses,
       totalSavings: savings,
       totalLoans: loans,
-      monthlyEMI: loans > 0 ? Math.round(loans * 0.009) : 0, // ~0.9% of outstanding/month estimate
+      monthlyEMI: emiEstimate,
       monthlySIP: monthlySIPEstimate,
-      hasTermInsurance: /term|life insurance|lic/i.test(investments),
-      hasHealthInsurance: /health|mediclaim/i.test(investments),
-      has80CInvestments: /80c|elss|ppf|nps|pf|provident/i.test(investments + goals),
-      portfolioDiversificationScore: 65, // Default until portfolio IDs provided
+      hasTermInsurance: input.hasTermInsurance ?? /term|lic|life.*insurance/i.test(investments),
+      hasHealthInsurance: input.hasHealthInsurance ?? /health|mediclaim/i.test(investments),
+      has80CInvestments: /80c|elss|ppf|pf|provident/i.test(investments + goals),
+      portfolioDiversificationScore: 65,
     });
 
-    // ── 2. Indian Tax Regime Comparison Engine ───────────────────────────────
-    const taxInput = estimateTaxInput(income * 12, age, expenses, loans);
+    // ── 3. Tax Engine ───────────────────────────────────────────────────────
+    const taxInput = _form16
+      ? {
+          annualIncome: _form16.grossSalary ?? income * 12,
+          age,
+          section80C: Math.min(_form16.section80C ?? 0, 150000),
+          section80D: Math.min(_form16.section80D ?? 25000, 100000),
+          hra: _form16.hra ?? 0,
+          lta: 10000,
+          homeLoanInterest: Math.min(_form16.homeLoanInterest ?? 0, 200000),
+          nps80CCD: 0,
+          standardDeduction: 50000,
+        }
+      : estimateTaxInput(income * 12, age, expenses, loans);
+
     const taxComparison = compareTaxRegimes(taxInput);
 
-    // Update rule engine's tax recommendation with real calculated figure
-    const taxSavingAmount = taxComparison.savedAmount;
-    const taxRec = ruleOutput.recommendations.find(r => r.id === 'tax_regime_switch');
-    if (!taxRec && taxSavingAmount > 10000) {
-      ruleOutput.recommendations.push({
-        id: 'tax_regime_switch',
-        category: 'tax',
-        severity: taxSavingAmount > 50000 ? 'high' : 'medium',
-        title: `Switch to ${taxComparison.recommendation === 'new' ? 'New' : 'Old'} Tax Regime`,
-        insight: `You can save ₹${taxSavingAmount.toLocaleString('en-IN')} (₹${taxComparison.savedMonthly.toLocaleString('en-IN')}/month) by switching to the ${taxComparison.recommendation} regime.`,
-        detail: taxComparison.reasoning,
-        action: `Submit Form 12BB declaring your regime preference to your employer before April 1.`,
-        estimatedImpact: `In-hand salary increases by ₹${taxComparison.savedMonthly.toLocaleString('en-IN')}/month.`,
-        safetyScore: 90,
-        growthScore: 40,
-      });
-    }
+    // ── 4. Portfolio Analysis ───────────────────────────────────────────────
+    const portfolioFundIds = fundIds ?? ['sbi_nifty_50_index', 'parag_parikh_flexi', 'axis_bluechip'];
+    const portfolioAnalysis = analyzePortfolio(portfolioFundIds);
 
-    // ── 3. FIRE & Wealth Projection Engine ───────────────────────────────────
-    const currentSIP = monthlySIPEstimate;
-    const investableSurplus = Math.max(0, income - expenses);
+    // ── 5. FIRE & Wealth Projections ────────────────────────────────────────
+    const investableSurplus = Math.max(0, income - expenses - emiEstimate);
     const optimizedSIP = Math.round(investableSurplus * 0.7 / 1000) * 1000;
-
     const wealthAndRetirement = calculateWealthAndRetirement(
-      age,
-      savings,
-      expenses,
-      currentSIP,
-      Math.max(currentSIP, optimizedSIP)
+      age, savings, expenses, monthlySIPEstimate, Math.max(monthlySIPEstimate, optimizedSIP)
     );
 
-    // ── 4. Portfolio X-Ray ────────────────────────────────────────────────────
-    // Parse fund IDs from request body (optional param from future portfolio input)
-    const fundIds: string[] = (body.fundIds as string[]) || [
-      'sbi_nifty_50_index',
-      'parag_parikh_flexi',
-      'axis_bluechip',
-    ];
-    const portfolioAnalysis = analyzePortfolio(fundIds);
+    // ── 6. Goal Planning ────────────────────────────────────────────────────
+    const goalsToAnalyze = goalsList?.map((g) => ({
+      ...g,
+      monthlyContribution: Math.round(investableSurplus * 0.3 / Math.max(1, (goalsList?.length ?? 1))),
+    })) ?? [];
+    const goalPlans = planAllGoals(goalsToAnalyze, riskAppetite);
+    const totalGoalSIP = totalGoalSIPRequired(goalPlans);
 
-    // ── 5. AI Summary (no calculations, just commentary) ─────────────────────
-    const aiPayload = {
+    // ── 7. Structured AI Advice ─────────────────────────────────────────────
+    const savingsRate = income > 0
+      ? parseFloat(((income - expenses) / income * 100).toFixed(1)) : 0;
+    const emergencyMonths = expenses > 0
+      ? parseFloat((savings / expenses).toFixed(1)) : 0;
+
+    const aiMetrics = {
       overallScore: ruleOutput.healthScoreComponents.overall,
-      savingsRate: income > 0 ? (((income - expenses) / income) * 100).toFixed(1) : 0,
-      emergencyMonths: expenses > 0 ? (savings / expenses).toFixed(1) : 0,
-      topThreats: ruleOutput.shockInsights.slice(0, 2),
+      savingsRate,
+      emergencyMonths,
+      debtToIncomeRatio: income > 0 ? parseFloat((emiEstimate / income * 100).toFixed(1)) : 0,
       taxRegimeRecommendation: taxComparison.recommendation,
-      taxSavingAmount,
+      taxSavingAmount: taxComparison.savedAmount,
+      shockInsights: ruleOutput.shockInsights,
       goals,
+      profileCompleteness,
     };
-    const aiSummary = await getFinancialSummary(aiPayload);
+    const aiAdvice = await getStructuredAdvice(aiMetrics);
 
-    // ── 6. Compose Final Response ─────────────────────────────────────────────
+    // Merge AI recommendations into rule engine ones (AI may have extra insight)
+    const mergedRecs = [
+      ...ruleOutput.recommendations,
+      // Add AI recs that don't overlap by ID
+      ...(aiAdvice.recommendations ?? []).filter(
+        (ar) => !ruleOutput.recommendations.find((r) => r.id === ar.id)
+      ),
+    ].slice(0, 8);
+
+    // ── 8. Compose Response ─────────────────────────────────────────────────
     const responseData = {
-      // Health Scores (multi-dimensional)
+      // Multi-dimensional health scores
       score: ruleOutput.healthScoreComponents,
 
-      // Tax Analysis
+      // Tax analysis
       taxComparison,
 
-      // FIRE & Wealth Projections
+      // FIRE & Wealth
       wealth_projection: wealthAndRetirement.wealth_projection,
       retirement_comparison: wealthAndRetirement.retirement_comparison,
 
-      // Recommendations (rule-based, sorted by severity)
-      recommendations: ruleOutput.recommendations,
+      // Goals
+      goalPlans,
+      totalGoalSIPRequired: totalGoalSIP,
+
+      // Recommendations (merged rule + AI)
+      recommendations: mergedRecs,
       shockInsights: ruleOutput.shockInsights,
       quickAction: ruleOutput.quickAction,
 
       // Portfolio X-Ray
       portfolioAnalysis,
 
-      // AI Mentor Summary
-      aiSummary,
+      // AI Advice (structured)
+      aiAdvice,
 
-      // Raw breakdowns for UI
+      // Breakdowns
       breakdown: {
-        savingsRate: income > 0 ? parseFloat(((income - expenses) / income * 100).toFixed(1)) : 0,
-        emergencyMonths: expenses > 0 ? parseFloat((savings / expenses).toFixed(1)) : 0,
+        savingsRate,
+        emergencyMonths,
         investableSurplus,
         optimizedSIP,
+        profileCompleteness,
+        dataSource,
       },
     };
 
-    // ── 7. Persist to DB (non-blocking) ──────────────────────────────────────
+    // ── 9. Persist to DB ────────────────────────────────────────────────────
     let savedId: string | null = null;
     try {
       await dbConnect();
       if (mongoose.connection?.readyState === 1) {
-        const record = await UserFinance.create({
+        const rec = await UserFinance.create({
           age, income, expenses, savings, investments, loans, goals,
           score: ruleOutput.healthScoreComponents.overall,
-          ai_summary: aiSummary ?? '',
-          insights: ruleOutput.recommendations.map(r => r.insight),
-          monthly_plan: ruleOutput.recommendations.map(r => r.action),
+          ai_summary: aiAdvice.summary,
+          insights: mergedRecs.map((r) => r.insight ?? r.title),
+          monthly_plan: mergedRecs.map((r) => r.action ?? ''),
         });
-        savedId = record._id?.toString() ?? null;
+        savedId = rec._id?.toString() ?? null;
       }
     } catch (dbErr) {
-      console.warn('[DB] Continuing without save:', (dbErr as Error).message);
+      log.warn({ err: dbErr }, 'DB save skipped');
     }
+
+    log.info({ duration: `${Date.now() - start}ms`, score: ruleOutput.healthScoreComponents.overall }, 'Analysis complete');
 
     return NextResponse.json({ success: true, data: responseData, savedId });
 
   } catch (error: any) {
-    console.error('[/api/analyze] Unhandled error:', error);
+    log.error({ err: error.message, stack: error.stack?.slice(0, 500) }, 'Unhandled error in /api/analyze');
     return NextResponse.json(
       { success: false, error: 'Internal server error. Please try again.' },
       { status: 500 }

@@ -33,7 +33,7 @@ const SCAN_STEPS = [
   { at: 98, text: "Building your wealth profile..." },
 ];
 
-export function Form16Scanner({ onSubmit }: { onSubmit: (data: any) => void }) {
+export function Form16Scanner({ onSubmit, compact = false }: { onSubmit: (data: any) => void; compact?: boolean }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [state, setState] = useState<UploadState>({
@@ -226,7 +226,8 @@ export function Form16Scanner({ onSubmit }: { onSubmit: (data: any) => void }) {
       />
 
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden relative">
-        {/* Header */}
+      {/* Compact mode hides the header branding */}
+      {!compact && (
         <div className="bg-[#8B0000] p-10 text-white relative">
           <h2 className="text-4xl font-serif font-bold mb-3 tracking-tight">
             AI Money Mentor
@@ -245,6 +246,7 @@ export function Form16Scanner({ onSubmit }: { onSubmit: (data: any) => void }) {
             </button>
           </div>
         </div>
+      )}
 
         {/* Body */}
         <div className="p-10">

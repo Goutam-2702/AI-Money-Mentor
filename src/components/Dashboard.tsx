@@ -6,7 +6,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from "recharts";
-import { AlertCircle, AlertTriangle, ShieldCheck, Zap, User, Users, Info } from "lucide-react";
+import { AlertCircle, AlertTriangle, ShieldCheck, Zap, User, Users, Info, CheckCircle2, Brain } from "lucide-react";
+import { ExplainBadge } from "@/components/ExplainBadge";
+import { GoalTracker } from "@/components/GoalTracker";
 
 // Helper for Central Gauge
 const GaugeChart = ({ score }: { score: number }) => {
@@ -387,6 +389,58 @@ export function Dashboard({ data, formData, onReset }: { data: any, formData: an
               );
             })}
           </div>
+        </motion.div>
+      )}
+
+      {/* GOAL TRACKER */}
+      {data.goalPlans && data.goalPlans.length > 0 && (
+        <GoalTracker
+          goalPlans={data.goalPlans}
+          totalGoalSIPRequired={data.totalGoalSIPRequired ?? 0}
+        />
+      )}
+
+      {/* AI MONTHLY CHECKLIST + RED FLAGS */}
+      {(data.aiAdvice?.monthlyChecklist?.length > 0 || data.aiAdvice?.redFlags?.length > 0) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-6"
+        >
+          {/* Monthly Checklist */}
+          {data.aiAdvice?.monthlyChecklist?.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-3 mb-4">
+                <Brain className="w-5 h-5 text-[#8B0000]" />
+                <h3 className="font-serif font-bold text-slate-800 dark:text-slate-100">This Month's Checklist</h3>
+              </div>
+              <ul className="space-y-3">
+                {data.aiAdvice.monthlyChecklist.map((item: string, i: number) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                    <span className="text-sm font-sans text-slate-600 dark:text-slate-400">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Red Flags */}
+          {data.aiAdvice?.redFlags?.length > 0 && (
+            <div className="bg-red-50 dark:bg-red-950/20 rounded-3xl p-6 border border-red-200 dark:border-red-800">
+              <div className="flex items-center gap-3 mb-4">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <h3 className="font-serif font-bold text-red-800 dark:text-red-300">Risk Alerts</h3>
+              </div>
+              <ul className="space-y-3">
+                {data.aiAdvice.redFlags.map((flag: string, i: number) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="text-red-500 font-bold text-sm shrink-0">!</span>
+                    <span className="text-sm font-sans text-red-700 dark:text-red-300">{flag}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </motion.div>
       )}
 
