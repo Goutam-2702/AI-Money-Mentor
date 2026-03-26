@@ -12,7 +12,7 @@
   "crons": [
     {
       "path": "/api/cron/update-nav",
-      "schedule": "0 */4 * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
